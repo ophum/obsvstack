@@ -1,8 +1,21 @@
 services:
+  nginx:
+    image: nginx
+    ports:
+      - ${NGINX_PORT}:80
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - grafana
+      - prometheus
+      - jaeger
+
   grafana:
     image: grafana/grafana-oss
-    ports:
-      - 3000:3000
+    environment:
+      GF_SERVER_DOMAIN: ${DOMAIN}
+      GF_SERVER_ROOT_URL: http://${DOMAIN}:${NGINX_PORT}/grafana/
+      GF_SERVER_SERVE_FROM_SUB_PATH: true
     volumes:
       - grafana:/var/lib/grafana
       - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
@@ -20,13 +33,16 @@ services:
 
   jaeger:
     image: jaegertracing/all-in-one:latest
-    ports:
-      - 16686:16686
+    environment:
+      QUERY_BASE_PATH: /jaeger
 
   prometheus:
     image: prom/prometheus
-    ports:
-      - 9090:9090
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.external-url=http://${DOMAIN}:${NGINX_PORT}/prometheus
+      - --web.route-prefix=/prometheus
+
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - ./prometheus/file_sd:/file_sd
@@ -46,8 +62,6 @@ services:
 
   alertmanager:
     image: prom/alertmanager
-    ports:
-      - 9093:9093
 
 volumes:
   grafana:
